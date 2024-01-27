@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Salary Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 10px;
+        }
+
+        .calculator-container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        input {
+            width: calc(100% - 20px);
+            padding: 8px;
+            margin-bottom: 10px;
+        }
+
+        button {
+            width: 48%;
+            background-color: #4caf50;
+            color: #fff;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 2%;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #hourlyPayLabel {
+            font-size: 1.2em;
+            margin-bottom: 10px;
+        }
+
+        #daysContainer {
+            margin-top: 20px;
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 10px;
+        }
+
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background-color: #4caf50;
+            color: #fff;
+        }
+
+        .total-row {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="calculator-container">
+        <h1>Salary Calculator</h1>
+        <label for="hourlyPay">Hourly Pay (in Shekels):</label>
+        <div id="hourlyPayLabel"></div>
+        <button onclick="changeHourlyPay()">Change</button>
+        <button onclick="exportLog()" style="float: right;">Export Log</button>
+
+        <label for="hoursWorked">Hours Worked (in hours or hh:mm):</label>
+        <input type="text" id="hoursWorked" placeholder=" הזן שעות כמו 10:42 או 2:51">
+
+        <button onclick="calculateDay('normal')">Add Normal Day</button>
+        <button onclick="calculateDay('holiday')">Add Holiday/Shabbat</button>
+        <button onclick="clearData()">Clear</button>
+
+        <div id="daysContainer"></div>
+
+        <div id="result"></div>
+    </div>
+
+    <script>
+        var hourlyPay;
+        var days = [];
+
+        function convertTimeToDecimal(time) {
+            if (time.includes('.')) {
+                return parseFloat(time);
+            }
+
+            var parts = time.split(':');
+            if (parts.length === 2) {
+                var hours = parseInt(parts[0]);
+                var minutes = parseInt(parts[1]);
+                return hours + minutes / 60;
+            } else {
+                return parseFloat(time);
+            }
+        }
+
+        function isValidHourlyPay(value) {
+            return !isNaN(value) && value > 0;
+        }
+
+        function isValidHoursWorked(value) {
+            return !isNaN(value) && value >= 0 && value <= 24;
+        }
+
+        function isValidTimeFormat(value) {
+            var timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+            return timeRegex.test(value);
+        }
+
+        function changeHourlyPay() {
+            var newHourlyPay = parseFloat(prompt('Enter New Hourly Pay (in Shekels):'));
+
+            if (!isValidHourlyPay(newHourlyPay)) {
+                alert('Please enter a valid positive value for hourly pay.');
+                return;
+            }
+
+            hourlyPay = newHourlyPay;
+            document.getElementById('hourlyPayLabel').textContent = 'Hourly Pay: ₪' + hourlyPay.toFixed(2);
+
+            alert('Hourly Pay has been updated to ₪' + hourlyPay.toFixed(2));
+        }
+
+        function calculateDay(dayType) {
+            if (!hourlyPay) {
+                alert('Please enter the hourly pay before adding a day.');
+                return;
+            }
+
+            var hoursWorkedInput = document.getElementById('hoursWorked').value;
+            var hoursWorked = convertTimeToDecimal(hoursWorkedInput);
+
+            if (!isValidHoursWorked(hoursWorked)) {
+                alert('Please enter a valid value for hours worked (between 0 and 24).');
+                return;
+            }
+
+            if (!isValidTimeFormat(hoursWorkedInput)) {
+                alert('Please enter a valid time format for hours worked (hh:mm).');
+                return;
+            }
+
+            var totalSalary = calculateTotalSalary(hoursWorked, dayType);
+
+            updateDaysContainer({
+                dayIndex: days.length + 1,
+                dayType: dayType,
+                totalSalary: totalSalary,
+                hoursWorked: hoursWorkedInput
+            });
+
+            updateTotalSalary();
+        }
+
+        function calculateTotalSalary(hoursWorked, dayType) {
+            var holidayRates = {
+                'normal': { 'rate1': 1, 'rate2': 1.25, 'rate3': 1.5 },
+                'holiday': { 'rate1': 1.5, 'rate2': 1.75, 'rate3': 2 }
+            };
+
+            var totalSalary = 0;
+
+            if (hoursWorked <= 8) {
+                totalSalary = hoursWorked * hourlyPay * holidayRates[dayType].rate1;
+            } else if (hoursWorked <= 10) {
+                totalSalary = 8 * hourlyPay * holidayRates[dayType].rate1 + (hoursWorked - 8) * hourlyPay * holidayRates[dayType].rate2;
+            } else {
+                totalSalary = 8 * hourlyPay * holidayRates[dayType].rate1 + 2 * hourlyPay * holidayRates[dayType].rate2 + (hoursWorked - 10) * hourlyPay * holidayRates[dayType].rate3;
+            }
+
+            return totalSalary;
+        }
+
+        function updateDaysContainer(dayData) {
+            var daysContainer = document.getElementById('daysContainer');
+
+            if (!daysContainer.hasChildNodes()) {
+                var table = document.createElement('table');
+
+                var headerRow = table.insertRow(0);
+                var headers = ['Day', 'Day Type', 'Hours Worked', 'Total Salary', 'Actions'];
+                for (var i = 0; i < headers.length; i++) {
+                    var th = document.createElement('th');
+                    th.textContent = headers[i];
+                    headerRow.appendChild(th);
+                }
+
+                daysContainer.appendChild(table);
+            }
+
+            var table = daysContainer.querySelector('table');
+            var row = table.insertRow(-1);
+
+            var cellDay = row.insertCell(0);
+            cellDay.textContent = 'Day ' + dayData.dayIndex;
+
+            var cellDayType = row.insertCell(1);
+            cellDayType.textContent = dayData.dayType.charAt(0).toUpperCase() + dayData.dayType.slice(1);
+
+            var cellHoursWorked = row.insertCell(2);
+            cellHoursWorked.textContent = dayData.hoursWorked;
+
+            var cellTotalSalary = row.insertCell(3);
+            cellTotalSalary.textContent = '₪' + dayData.totalSalary.toFixed(2);
+
+            var cellActions = row.insertCell(4);
+            var editButton = document.createElement('button');
+            editButton.textContent = 'Edit';
+            editButton.onclick = function() {
+                editDay(dayData.dayIndex);
+            };
+            cellActions.appendChild(editButton);
+
+            var removeButton = document.createElement('button');
+            removeButton.textContent = 'Remove';
+            removeButton.onclick = function() {
+                removeDay(dayData.dayIndex);
+            };
+            cellActions.appendChild(removeButton);
+
+            days.push(dayData);
+        }
+
+        function editDay(dayIndex) {
+            var day = days.find(function(day) {
+                return day.dayIndex === dayIndex;
+            });
+
+            if (day) {
+                var newHours = prompt('Enter new hours for Day ' + dayIndex + ':', day.hoursWorked);
+                if (newHours !== null) {
+                    var hoursWorked = convertTimeToDecimal(newHours);
+
+                    if (!isValidHoursWorked(hoursWorked)) {
+                        alert('Please enter a valid value for hours worked (between 0 and 24).');
+                        return;
+                    }
+
+                    if (!isValidTimeFormat(newHours)) {
+                        alert('Please enter a valid time format for hours worked (hh:mm).');
+                        return;
+                    }
+
+                    day.hoursWorked = newHours;
+                    day.totalSalary = calculateTotalSalary(convertTimeToDecimal(newHours), day.dayType);
+
+                    var table = document.querySelector('#daysContainer table');
+                    var rows = table.rows;
+                    for (var i = 0; i < rows.length; i++) {
+                        var row = rows[i];
+                        if (row.cells[0].textContent === 'Day ' + dayIndex) {
+                            row.cells[2].textContent = newHours;
+                            row.cells[3].textContent = '₪' + day.totalSalary.toFixed(2);
+                            break;
+                        }
+                    }
+
+                    updateTotalSalary();
+                }
+            }
+        }
+
+        function removeDay(dayIndex) {
+            var indexToRemove = days.findIndex(function(day) {
+                return day.dayIndex === dayIndex;
+            });
+
+            if (indexToRemove !== -1) {
+                days.splice(indexToRemove, 1);
+
+                var table = document.querySelector('#daysContainer table');
+                var rows = table.rows;
+                for (var i = 0; i < rows.length; i++) {
+                    var row = rows[i];
+                    if (row.cells[0].textContent === 'Day ' + dayIndex) {
+                        table.deleteRow(i);
+                        break;
+                    }
+                }
+
+                updateTotalSalary();
+            }
+        }
+
+        function updateTotalSalary() {
+            var totalSalary = days.reduce(function (acc, day) {
+                return acc + day.totalSalary;
+            }, 0);
+
+            var resultContainer = document.getElementById('result');
+            resultContainer.innerHTML = '';
+
+            var totalRow = document.createElement('div');
+            totalRow.classList.add('total-row');
+            totalRow.textContent = 'Total Salary for All Days: ₪' + totalSalary.toFixed(2);
+
+            resultContainer.appendChild(totalRow);
+        }
+
+        function clearData() {
+            hourlyPay = undefined;
+            days = [];
+
+            document.getElementById('hourlyPayLabel').textContent = '';
+            document.getElementById('hoursWorked').value = '';
+
+            var daysContainer = document.getElementById('daysContainer');
+            daysContainer.innerHTML = '';
+
+            var resultContainer = document.getElementById('result');
+            resultContainer.innerHTML = '';
+        }
+
+        function exportLog() {
+            if (days.length === 0) {
+                alert('No data available to export.');
+                return;
+            }
+
+            var normalDayHours = 0;
+            var holidayHours = 0;
+            var totalSalary = 0;
+
+            var dataToExport = 'Day,Day Type,Total Salary (₪)\n';
+            days.forEach(function (day) {
+                dataToExport += day.dayIndex + ',' + day.dayType + ',' + day.totalSalary.toFixed(2) + '\n';
+
+                if (day.dayType === 'normal') {
+                    normalDayHours += convertTimeToDecimal(day.hoursWorked);
+                } else {
+                    holidayHours += convertTimeToDecimal(day.hoursWorked);
+                }
+
+                totalSalary += day.totalSalary;
+            });
+
+            dataToExport += 'Sum of Normal Day Hours,' + normalDayHours.toFixed(2) + '\n';
+            dataToExport += 'Sum of Holiday Hours,' + holidayHours.toFixed(2) + '\n';
+            dataToExport += 'Combined Money Made (₪),' + totalSalary.toFixed(2) + '\n';
+
+            var blob = new Blob([dataToExport], { type: 'text/plain' });
+            var url = URL.createObjectURL(blob);
+
+            var a = document.createElement('a');
+            a.href = url;
+            a.download = 'salary_log.txt';
+            document.body.appendChild(a);
+            a.click();
+
+            // Cleanup
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+
+</body>
+</html>
